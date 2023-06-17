@@ -1,0 +1,18 @@
+{
+  "name": "karen-beta",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@firebase/app": "^0.9.12",
+    "@firebase/database": "^0.14.4",
+    "@hapi/hapi": "^21.3.2"
+  }
+}
