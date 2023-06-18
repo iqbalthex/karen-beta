@@ -8,7 +8,7 @@ int timerDelay = 5000;
 int code;
 String endPoint, response, data;
 
-struct {
+typedef struct {
   String datetime;
   float direction, speed;
 } Current;
