@@ -1,129 +1,95 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include <SPI.h>
+#include <HttpClient.h>
+#include <Ethernet.h>
+#include <EthernetClient.h>
 
 const char* HOST = "https://karen-meter-beta-default-rtdb.firebaseio.com";
 const char* SSID = "SSID";
 const char* PASS = "PASS";
-int timerDelay = 5000;
-int code;
-String endPoint, response, data;
+int code, timerDelay = 5000;
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+
+EthernetClient client;
+HttpClient     http(client);
 
 typedef struct {
   String datetime;
   float direction, speed;
 } Current;
 
-HTTPClient http;
+void updateAll(Current current);
+void updateLatest(Current current);
 
-void setup(Current current) {
+
+void setup() {
   Serial.begin(115200);
-  WiFi.begin(SSID, PASS);
 
-  Serial.print("Connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
+  while (Ethernet.begin(mac) != 1) {
+    Serial.println("Error getting IP address via DHCP, trying again...");
+    delay(15000);
+  }  
 }
+
 
 void loop() {
   delay(timerDelay);
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Current current;
+  Current current;
+  // current.datetime  = "2023-06-18_00:00:00";
+  // current.direction = 115;
+  // current.speed     = 0.4;
 
-    current.datetime  = getDatetime();
-    current.direction = getDirection();
-    current.speed     = getSpeed();
-
-    updateAll(current);
-    updateLatest(current);
-  } else {
-    Serial.println("WiFi disconnected");
-
-    while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
-  }
+  updateAll(current);
+  updateLatest(current);
 }
 
 
-/**
- * Get datetime from clock component.
- */
-String getDatetime() {
-  return "";
-}
-
-
-/**
- * Get direction from compass component.
- */
-float getDirection() {
-  return 0.0;
-}
-
-
-/**
- * Get speed from current meter component.
- */
-float getSpeed() {
-  return 0.0;
-}
-
-
-/**
- * Update data in Firebase Realtime Database at 'current/all/{#datetime}' path.
- */
 void updateAll(Current current) {
-  endPoint = HOST + "/current/all/" + current.datetime + ".json";
+  const char* endPoint = "/current.json";
 
-  data = "";
-  data += "\"direction\":" + current.direction + ",";
-  data += "\"speed\":"     + current.speed;
+  String dataStr = "{\"" + current.datetime + "\":{";
+  dataStr += "\"direction\":" + String(current.direction) + ',';
+  dataStr += "\"speed\":"     + String(current.speed);
+  dataStr += "}}";
 
-  http.begin(endPoint.c_str());
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  const char* dataPtr = dataStr.c_str();
 
-  code = http.PUT("{" + data + "}");
+  http.put(HOST, endPoint, dataPtr);
+  code = http.responseStatusCode();
 
   if (code > 0) {
-    response = "Update data success";
+    // Serial.println("Data updated: ");
+    // Serial.println(http.read());
+    Serial.println("Update data success");
   } else {
-    response = "Update data failed with code: " + code;
+    Serial.println("Update data failed with code: " + code);
   }
 
-  http.end();
-  return response;
+  http.stop();
 }
 
 
-/**
- * Update data in Firebase Realtime Database at 'current/latest' path.
- */
 void updateLatest(Current current) {
-  String endPoint = HOST + "/current/latest" + ".json";
+  const char* endPoint = "/current/latest.json";
 
-  data = "";
-  data += "\"datetime\":"  + current.datetime  + ",";
-  data += "\"direction\":" + current.direction + ",";
-  data += "\"speed\":"     + current.speed;
+  String dataStr = "{";
+  dataStr += "\"datetime\":"  + String(current.datetime)  + ',';
+  dataStr += "\"direction\":" + String(current.direction) + ',';
+  dataStr += "\"speed\":"     + String(current.speed);
+  dataStr += "}";
 
-  http.begin(endPoint.c_str());
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  const char* dataPtr = dataStr.c_str();
 
-  code = http.PUT("{" + data + "}");
+  http.put(HOST, endPoint, dataPtr);
+  code = http.responseStatusCode();
 
   if (code > 0) {
-    response = "Update data success";
+    // Serial.println("Data updated: ");
+    // Serial.println(http.read());
+    Serial.println("Update data success");
   } else {
-    response = "Update data failed with code: " + code;
+    Serial.println("Update data failed with code: " + code);
   }
 
-  http.end();
-  return response;
+  http.stop();
 }
-
