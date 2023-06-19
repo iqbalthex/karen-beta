@@ -2,27 +2,52 @@
 #include <HttpClient.h>
 #include <Ethernet.h>
 #include <EthernetClient.h>
+#include <HMC5883L_Simple.h>
+#include <Wire.h>
 
-const char* HOST = "https://karen-meter-beta-default-rtdb.firebaseio.com";
-const char* SSID = "SSID";
-const char* PASS = "PASS";
-int code, timerDelay = 5000;
+#define HOST "https://karen-meter-beta-default-rtdb.firebaseio.com"
+#define SSID "SSID"
+#define PASS "PASS"
+
+#define TIMER_DELAY 5000
+
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT  64
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing reset pin)
+
+// Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+int code;
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+float compassHeading;
+// DateTime now;
 
-EthernetClient client;
-HttpClient     http(client);
+EthernetClient  client;
+HMC5883L_Simple compass;
+HttpClient      http(client);
+// RTC_DS3231      rtc;
 
 typedef struct {
   String datetime;
-  float direction, speed;
+  float  direction, speed;
 } Current;
 
-void updateAll(Current current);
-void updateLatest(Current current);
+
+String getDatetime();
+float  getDirection();
+float  getSpeed();
+void   updateAll(Current current);
+void   updateLatest(Current current);
 
 
 void setup() {
   Serial.begin(115200);
+  Wire.begin();
+  // rtc.begin();
+  // rtc.adjust(DateTime(__DATE__, __TIME__));
+
+  compass.SetSamplingMode(COMPASS_CONTINUOUS);
+  compass.SetOrientation(COMPASS_HORIZONTAL_X_NORTH);
 
   while (Ethernet.begin(mac) != 1) {
     Serial.println("Error getting IP address via DHCP, trying again...");
@@ -32,18 +57,46 @@ void setup() {
 
 
 void loop() {
-  delay(timerDelay);
+  delay(TIMER_DELAY);
 
   Current current;
-  // current.datetime  = "2023-06-18_00:00:00";
-  // current.direction = 115;
-  // current.speed     = 0.4;
+  // current.datetime  = getDatetime();
+  current.direction = getDirection();
+  // current.speed     = getSpeed();
 
   updateAll(current);
   updateLatest(current);
 }
 
 
+// Get datetime from NTP clock.
+String getDatetime() {
+  // now = rtc.now();
+
+  // String year = String(now.year());
+
+  // display.setTextSize(1);
+  // display.setCursor(0,0);
+  // display.println(now.year(), DEC);
+
+  return "";
+}
+
+
+// Get direction from compass.
+float getDirection() {
+  compassHeading = compass.GetHeadingDegrees();
+  return compassHeading;
+}
+
+
+// Get speed from current meter.
+float getSpeed() {
+  return 0.0;
+}
+
+
+// Update data in Firebase Realtime Database at 'current/all/{#datetime}' path.
 void updateAll(Current current) {
   const char* endPoint = "/current.json";
 
@@ -69,6 +122,7 @@ void updateAll(Current current) {
 }
 
 
+// Update data in Firebase Realtime Database at 'current/latest' path.
 void updateLatest(Current current) {
   const char* endPoint = "/current/latest.json";
 
@@ -93,3 +147,4 @@ void updateLatest(Current current) {
 
   http.stop();
 }
+
