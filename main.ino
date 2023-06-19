@@ -1,11 +1,14 @@
 #include <SPI.h>
-#include <HttpClient.h>
-#include <Ethernet.h>
-#include <EthernetClient.h>
-#include <HMC5883L_Simple.h>
+#include <Bridge.h>
+#include <HTTPClient.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "RTClib.h"
+#include <Adafruit_Sensor.h>
+#include <Adafruit_HMC5883_U.h>
 #include <Wire.h>
 
-#define HOST "https://karen-meter-beta-default-rtdb.firebaseio.com"
+//#define HOST "https://karen-meter-beta-default-rtdb.firebaseio.com"
 #define SSID "SSID"
 #define PASS "PASS"
 
@@ -17,14 +20,17 @@
 
 // Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-int code;
+const String HOST = "https://karen-meter-beta-default-rtdb.firebaseio.com";
+int statusCode;
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-float compassHeading;
+float xHeading;
 // DateTime now;
 
-EthernetClient  client;
-HMC5883L_Simple compass;
-HttpClient      http(client);
+//EthernetClient  client;
+//HTTPClient      http(client);
+
+HttpClient http;
+Adafruit_HMC5883_Unified compass = Adafruit_HMC5883_Unified(12345);
 // RTC_DS3231      rtc;
 
 typedef struct {
@@ -42,17 +48,21 @@ void   updateLatest(Current current);
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin();
+  pinMode(13, OUTPUT);
+//  Wire.begin();
   // rtc.begin();
   // rtc.adjust(DateTime(__DATE__, __TIME__));
 
-  compass.SetSamplingMode(COMPASS_CONTINUOUS);
-  compass.SetOrientation(COMPASS_HORIZONTAL_X_NORTH);
+  /* Initialise the sensor */
+//  if(!compass.begin())
+//  {
+//    /* There was a problem detecting the HMC5883 ... check your connections */
+//    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
+//    while(1);
+//  }
 
-  while (Ethernet.begin(mac) != 1) {
-    Serial.println("Error getting IP address via DHCP, trying again...");
-    delay(15000);
-  }  
+//  compass.SetSamplingMode(COMPASS_CONTINUOUS);
+//  compass.SetOrientation(COMPASS_HORIZONTAL_X_NORTH);
 }
 
 
@@ -61,11 +71,12 @@ void loop() {
 
   Current current;
   // current.datetime  = getDatetime();
-  current.direction = getDirection();
+//  current.direction = getDirection();
   // current.speed     = getSpeed();
 
-  updateAll(current);
-  updateLatest(current);
+//  updateAll(current);
+  updateAll();
+//  updateLatest(current);
 }
 
 
@@ -85,8 +96,12 @@ String getDatetime() {
 
 // Get direction from compass.
 float getDirection() {
-  compassHeading = compass.GetHeadingDegrees();
-  return compassHeading;
+  /* Get a new sensor event */ 
+//  sensors_event_t event; 
+//  compass.getEvent(&event);
+//
+//  xHeading = event.magnetic.x;
+//  return xHeading;
 }
 
 
@@ -97,32 +112,44 @@ float getSpeed() {
 
 
 // Update data in Firebase Realtime Database at 'current/all/{#datetime}' path.
-void updateAll(Current current) {
-  const char* endPoint = "/current.json";
+//void updateAll(Current current) {
+void updateAll() {
+//  String dataStr = "{\"" + current.datetime + "\":{";
+//  dataStr += "\"direction\":" + String(current.direction) + ',';
+//  dataStr += "\"speed\":"     + String(current.speed);
+//  dataStr += "}}";
 
-  String dataStr = "{\"" + current.datetime + "\":{";
-  dataStr += "\"direction\":" + String(current.direction) + ',';
-  dataStr += "\"speed\":"     + String(current.speed);
-  dataStr += "}}";
+  String endPoint = HOST + "/current.json";
 
-  const char* dataPtr = dataStr.c_str();
+  // http.begin(endPoint);
 
-  http.put(HOST, endPoint, dataPtr);
-  code = http.responseStatusCode();
+  // http.put(HOST, endPoint, dataPtr);
+  statusCode = http.get(endPoint);
 
-  if (code > 0) {
-    // Serial.println("Data updated: ");
-    // Serial.println(http.read());
-    Serial.println("Update data success");
+  if (statusCode > 0) {
+    while (http.available()) {
+      Serial.print(http.read());
+    }
+    Serial.println("");
+
+    Serial.println("Data updated: ");
+
+    digitalWrite(13, 1);
+    delay(500);
+    digitalWrite(13, 0);
+    digitalWrite(13, 1);
+    delay(500);
+    digitalWrite(13, 0);
   } else {
-    Serial.println("Update data failed with code: " + code);
+    Serial.println("Update data failed with code: " + statusCode);
+    digitalWrite(13, 1);
+    delay(2000);
+    digitalWrite(13, 0);
   }
-
-  http.stop();
 }
 
 
-// Update data in Firebase Realtime Database at 'current/latest' path.
+/*/ Update data in Firebase Realtime Database at 'current/latest' path.
 void updateLatest(Current current) {
   const char* endPoint = "/current/latest.json";
 
@@ -135,16 +162,13 @@ void updateLatest(Current current) {
   const char* dataPtr = dataStr.c_str();
 
   http.put(HOST, endPoint, dataPtr);
-  code = http.responseStatusCode();
+  statusCode = http.responseStatusCode();
 
-  if (code > 0) {
+  if (statusCode > 0) {
     // Serial.println("Data updated: ");
     // Serial.println(http.read());
     Serial.println("Update data success");
   } else {
-    Serial.println("Update data failed with code: " + code);
+    Serial.println("Update data failed with code: " + statusCode);
   }
-
-  http.stop();
-}
-
+}*/
