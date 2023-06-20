@@ -1,174 +1,135 @@
-#include <SPI.h>
-#include <Bridge.h>
+#include <Arduino.h>
+
 #include <HTTPClient.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+
+#include <WiFiMulti.h>
+
 #include "RTClib.h"
-#include <Adafruit_Sensor.h>
-#include <Adafruit_HMC5883_U.h>
-#include <Wire.h>
 
-//#define HOST "https://karen-meter-beta-default-rtdb.firebaseio.com"
-#define SSID "SSID"
-#define PASS "PASS"
+WiFiMulti  wifi;
+HTTPClient http;
+RTC_DS3231 rtc;
 
-#define TIMER_DELAY 5000
-
-#define SCREEN_WIDTH  128
-#define SCREEN_HEIGHT  64
-#define OLED_RESET     -1 // Reset pin # (or -1 if sharing reset pin)
-
-// Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-const String HOST = "https://karen-meter-beta-default-rtdb.firebaseio.com";
 int statusCode;
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-float xHeading;
-// DateTime now;
-
-//EthernetClient  client;
-//HTTPClient      http(client);
-
-HttpClient http;
-Adafruit_HMC5883_Unified compass = Adafruit_HMC5883_Unified(12345);
-// RTC_DS3231      rtc;
 
 typedef struct {
   String datetime;
-  float  direction, speed;
+  float direction, speed;
 } Current;
 
 
 String getDatetime();
 float  getDirection();
 float  getSpeed();
-void   updateAll(Current current);
-void   updateLatest(Current current);
+void   updateAll();
+//void   updateLatest();
 
 
 void setup() {
   Serial.begin(115200);
-  pinMode(13, OUTPUT);
-//  Wire.begin();
-  // rtc.begin();
-  // rtc.adjust(DateTime(__DATE__, __TIME__));
 
-  /* Initialise the sensor */
-//  if(!compass.begin())
-//  {
-//    /* There was a problem detecting the HMC5883 ... check your connections */
-//    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
-//    while(1);
-//  }
+  for(uint8_t t = 3; t > 0; t--) {
+    Serial.printf("[SETUP] WAIT %d...\n", t);
+    delay(1000);
+  }
 
-//  compass.SetSamplingMode(COMPASS_CONTINUOUS);
-//  compass.SetOrientation(COMPASS_HORIZONTAL_X_NORTH);
+  wifi.addAP("Galaxy J3 ProE5DF", "102938475600");
+
+  if (!rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+  }
+  rtc.adjust(DateTime(__DATE__, __TIME__));
 }
-
 
 void loop() {
-  delay(TIMER_DELAY);
+  if (wifi.run() == WL_CONNECTED) {
+    Current current;
+    current.datetime  = "2023-06-19_15:00:00"; // getDatetime();
+    current.direction = 124; // getDirection();
+    current.speed     = 0.8; // getSpeed();
 
-  Current current;
-  // current.datetime  = getDatetime();
-//  current.direction = getDirection();
-  // current.speed     = getSpeed();
-
-//  updateAll(current);
-  updateAll();
-//  updateLatest(current);
+//    updateAll(current);
+    updateLatest(current);
+  }
+  delay(3000);
 }
 
 
-// Get datetime from NTP clock.
 String getDatetime() {
-  // now = rtc.now();
+  Datetime now;
 
-  // String year = String(now.year());
+  String year   = String(now.year());
+  String month  = String(now.month());
+  String day    = String(now.day());
+  String hour   = String(now.hour());
+  String minute = String(now.minute());
+  String second = String(now.second());
 
-  // display.setTextSize(1);
-  // display.setCursor(0,0);
-  // display.println(now.year(), DEC);
-
-  return "";
+  // String datetime;
+  // sprintf(datetime, "%s-%s-%s_%s:%s:%s", year, minute, day, hour, minute, second);
+  return year + '-' + month + '-' + day + '_' + hour + ':' + minute + ':' + second;
 }
 
 
-// Get direction from compass.
 float getDirection() {
-  /* Get a new sensor event */ 
-//  sensors_event_t event; 
-//  compass.getEvent(&event);
-//
-//  xHeading = event.magnetic.x;
-//  return xHeading;
+  return 0.0;
 }
 
 
-// Get speed from current meter.
 float getSpeed() {
   return 0.0;
 }
 
 
-// Update data in Firebase Realtime Database at 'current/all/{#datetime}' path.
-//void updateAll(Current current) {
 void updateAll() {
-//  String dataStr = "{\"" + current.datetime + "\":{";
-//  dataStr += "\"direction\":" + String(current.direction) + ',';
-//  dataStr += "\"speed\":"     + String(current.speed);
-//  dataStr += "}}";
+  http.begin("https://karen-meter-beta-default-rtdb.firebaseio.com/current/all.json");
+  Serial.println("Updating data...");
 
-  String endPoint = HOST + "/current.json";
+  String data = '{';
+  data += "\"datetime\":"  + String(current.datetime)  + ',';
+  data += "\"direction\":" + String(current.direction) + ',';
+  data += "\"speed\":"     + String(current.speed);
+  data += '}';
 
-  // http.begin(endPoint);
+  statusCode = http.PATCH(data);
 
-  // http.put(HOST, endPoint, dataPtr);
-  statusCode = http.get(endPoint);
+  if(statusCode > 0) {
+    Serial.printf("Status code: %d\n", statusCode);
 
-  if (statusCode > 0) {
-    while (http.available()) {
-      Serial.print(http.read());
+    if(statusCode == HTTP_CODE_OK) {
+      String payload = http.getString();
     }
-    Serial.println("");
-
-    Serial.println("Data updated: ");
-
-    digitalWrite(13, 1);
-    delay(500);
-    digitalWrite(13, 0);
-    digitalWrite(13, 1);
-    delay(500);
-    digitalWrite(13, 0);
-  } else {
-    Serial.println("Update data failed with code: " + statusCode);
-    digitalWrite(13, 1);
-    delay(2000);
-    digitalWrite(13, 0);
-  }
-}
-
-
-/*/ Update data in Firebase Realtime Database at 'current/latest' path.
-void updateLatest(Current current) {
-  const char* endPoint = "/current/latest.json";
-
-  String dataStr = "{";
-  dataStr += "\"datetime\":"  + String(current.datetime)  + ',';
-  dataStr += "\"direction\":" + String(current.direction) + ',';
-  dataStr += "\"speed\":"     + String(current.speed);
-  dataStr += "}";
-
-  const char* dataPtr = dataStr.c_str();
-
-  http.put(HOST, endPoint, dataPtr);
-  statusCode = http.responseStatusCode();
-
-  if (statusCode > 0) {
-    // Serial.println("Data updated: ");
-    // Serial.println(http.read());
     Serial.println("Update data success");
   } else {
-    Serial.println("Update data failed with code: " + statusCode);
+    Serial.println("Update data failed");
+    Serial.printf("Error: %s\n", http.errorToString(statusCode).c_str());
   }
-}*/
+
+  http.end();
+}
+
+void updateLatest(Current current) {
+  http.begin("https://karen-meter-beta-default-rtdb.firebaseio.com/current/latest.json");
+  Serial.println("Updating data...");
+
+  String data = "{\"" + current.datetime + "\":{";
+  data += "\"direction\":" + String(current.direction) + ',';
+  data += "\"speed\":"     + String(current.speed);
+  data += "}}";
+
+  statusCode = http.PUT(data);
+
+  if(statusCode > 0) {
+    Serial.printf("Status code: %d\n", statusCode);
+
+    if(statusCode == HTTP_CODE_OK) {
+      String payload = http.getString();
+    }
+    Serial.println("Update data success");
+  } else {
+    Serial.println("Update data failed");
+    Serial.printf("Error: %s\n", http.errorToString(statusCode).c_str());
+  }
+
+  http.end();
+}
